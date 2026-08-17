@@ -1,4 +1,6 @@
 import os
+from datetime import time
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -16,7 +18,10 @@ import db
 load_dotenv()
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID = int(os.environ["CHAT_ID"])
 ALLOWED_USER_IDS = {int(x) for x in os.environ["ALLOWED_USER_IDS"].split(",")}
+BOGOTA = ZoneInfo("America/Bogota")
+HORA_DIGEST = time(hour=8, minute=30, tzinfo=BOGOTA)
 
 
 def allowed(update: Update) -> bool:
@@ -27,18 +32,23 @@ def build_list(chat_id: int):
     rows = db.list_open(chat_id)
     if not rows:
         return "✅ No hay pendientes abiertos.", None
-    lineas = [f"#{r['id']} · {r['title']}" for r in rows]
+    lineas = [f"· {r['title']}" for r in rows]
     texto = "🧾 Pendientes abiertos\n\n" + "\n".join(lineas)
     botones = [
         [
             InlineKeyboardButton(
-                f"✅ #{r['id']} {r['title'][:20]}",
+                f"✅ {r['title'][:40]}",
                 callback_data=f"resolve:{r['id']}",
             )
         ]
         for r in rows
     ]
     return texto, InlineKeyboardMarkup(botones)
+
+
+async def send_digest(context: ContextTypes.DEFAULT_TYPE) -> None:
+    texto, botones = build_list(CHAT_ID)
+    await context.bot.send_message(CHAT_ID, texto, reply_markup=botones)
 
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -50,7 +60,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         created_by=update.effective_user.id,
         title=title,
     )
-    await update.message.reply_text(f"✅ Guardado #{pending_id}: {title}")
+    await update.message.reply_text(f"✅ Guardado: {title}")
 
 
 async def on_lista(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -58,6 +68,12 @@ async def on_lista(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     texto, botones = build_list(update.effective_chat.id)
     await update.message.reply_text(texto, reply_markup=botones)
+
+
+async def on_digest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not allowed(update):
+        return
+    await send_digest(context)
 
 
 async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -77,10 +93,12 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main() -> None:
     db.init()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("lista", on_lista))
+    app.add_handler(CommandHandler(["lista", "list", "hoy", "tareas"], on_lista))
+    app.add_handler(CommandHandler(["digest", "resumen"], on_digest))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
-    print("Bot corriendo. Ctrl+C para parar.")
+    app.job_queue.run_daily(send_digest, time=HORA_DIGEST, name="digest")
+    print(f"Bot corriendo. Digest diario a las {HORA_DIGEST}. Ctrl+C para parar.")
     app.run_polling(drop_pending_updates=True)
 
 

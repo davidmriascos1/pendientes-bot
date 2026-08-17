@@ -35,3 +35,14 @@ def list_open(chat_id: int) -> list[sqlite3.Row]:
             "ORDER BY created_at",
             (chat_id,),
         ).fetchall()
+
+
+def resolve_pending(pending_id: int, resolved_by: int) -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as conn:
+        cur = conn.execute(
+            "UPDATE pendings SET state = 'RESOLVED', resolved_at = ?, "
+            "resolved_by = ? WHERE id = ? AND state = 'OPEN'",
+            (now, resolved_by, pending_id),
+        )
+        return cur.rowcount == 1

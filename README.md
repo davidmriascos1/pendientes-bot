@@ -1,48 +1,50 @@
-# Bot de Pendientes
+# Pendientes Bot
 
-Bot de Telegram que mantiene vivos los acuerdos entre dos personas
-—platas prestadas, tareas, favores— hasta que alguien confirma que se
-hicieron.
+*English · [Español](README.es.md)*
 
-## Qué NO es
+A Telegram bot that keeps agreements between two people alive — money
+owed, chores, favors — until someone confirms they were done.
 
-No es un rastreador de gastos. No hay categorías, presupuestos, balances
-ni dashboards. El objetivo no es saber cuánto gastamos, sino que algo que
-requiere una acción no desaparezca de nuestra atención hasta resolverse.
+## What it is not
 
-El principio central: **un recordatorio no desaparece porque pasó la
-fecha, sino porque un humano confirmó que la acción terminó.**
+Not an expense tracker. No categories, no budgets, no balances, no
+dashboards. The goal isn't knowing how much we spent; it's making sure
+something that requires an action doesn't fall out of our attention
+until it's resolved.
 
-## Cómo funciona
+The core principle: **a reminder doesn't disappear because the due date
+passed. It disappears because a human confirmed the action was done.**
 
-    Registrar  ->  Recordar  ->  Cerrar
+## How it works
 
-- Escribes un mensaje normal en el grupo y se guarda como pendiente
-- Cada mañana a las 8:30 llega un resumen con todo lo abierto
-- Un boton por pendiente lo marca como resuelto
+    Create  ->  Remind  ->  Close
+
+- You write a normal message in the group and it becomes a pending item
+- Every morning at 8:30 a digest arrives with everything still open
+- One button per item marks it resolved
 
 ## Stack
 
 - Python 3.14
 - python-telegram-bot (long polling)
-- SQLite con SQL crudo (sin ORM)
-- JobQueue / APScheduler para el resumen diario
+- SQLite with raw SQL (no ORM)
+- JobQueue / APScheduler for the daily digest
 
-Sin framework web, sin base de datos remota, sin Docker. Dos usuarios y
-~20 pendientes activos no justifican mas infraestructura.
+No web framework, no remote database, no Docker. Two users and ~20 open
+items don't justify more infrastructure.
 
-## Maquina de estados
+## State machine
 
     DRAFT -> OPEN -> RESOLVED
                   -> ARCHIVED
 
-El estado vive en la columna `state`. Resolver usa una guarda SQL
-(`WHERE id = ? AND state = 'OPEN'`), asi que un pendiente no se puede
-resolver dos veces aunque las dos personas toquen el boton a la vez.
+State lives in the `state` column. Resolving uses a SQL guard
+(`WHERE id = ? AND state = 'OPEN'`), so an item can't be resolved twice
+even if both people tap the button at the same moment.
 
-## Correrlo
+## Running it
 
-    git clone <este-repo>
+    git clone https://github.com/davidmriascos1/pendientes-bot
     cd pendientes-bot
     python3 -m venv .venv
     source .venv/bin/activate
@@ -50,11 +52,10 @@ resolver dos veces aunque las dos personas toquen el boton a la vez.
     cp .env.example .env
     ./run.sh
 
-Necesitas un bot creado con @BotFather y el privacy mode desactivado
-(`/setprivacy` -> Disable), o el bot no vera los mensajes normales del
-grupo.
+You'll need a bot created via @BotFather with privacy mode **disabled**
+(`/setprivacy` -> Disable), or the bot won't see ordinary group messages.
 
-## Estado actual
+## Status
 
-V0 funcionando. Falta: fechas limite, cadencias de recordatorio,
-soporte multi-grupo y despliegue.
+V0 working. Not yet built: due dates, reminder cadences, multi-group
+support, deployment.

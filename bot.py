@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest, Conflict, NetworkError
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -101,6 +102,17 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query.edit_message_text(texto, reply_markup=botones)
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    err = context.error
+    if isinstance(err, Conflict):
+        log.critical("otro proceso está usando el mismo token: %s", err)
+        return
+    if isinstance(err, NetworkError) and not isinstance(err, BadRequest):
+        log.warning("red inestable: %s", err)
+        return
+    log.error("error no manejado", exc_info=err)
+
+
 def main() -> None:
     db.init()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -110,6 +122,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
     app.job_queue.run_daily(send_digest, time=HORA_DIGEST, name="digest")
     log.info("bot arriba, digest diario a las %s", HORA_DIGEST)
+    app.add_error_handler(on_error)
     app.run_polling(drop_pending_updates=True)
 
 

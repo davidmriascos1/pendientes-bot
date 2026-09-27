@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from datetime import time
@@ -55,9 +56,15 @@ def build_list(chat_id: int):
 async def send_digest(context: ContextTypes.DEFAULT_TYPE) -> None:
     abiertos = len(db.list_open(CHAT_ID))
     texto, botones = build_list(CHAT_ID)
-    await context.bot.send_message(CHAT_ID, texto, reply_markup=botones)
-    log.info("digest enviado con %s pendientes abiertos", abiertos)
-
+    for intento in range(1, 4):
+        try:
+            await context.bot.send_message(CHAT_ID, texto, reply_markup=botones)
+            log.info("digest enviado con %s pendientes abiertos", abiertos)
+            return
+        except NetworkError as e:
+            log.warning("digest intento %s falló: %s", intento, e)
+            await asyncio.sleep(30 * intento)
+    log.error("digest NO enviado tras 3 intentos")
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not allowed(update):
@@ -123,8 +130,7 @@ def main() -> None:
     app.job_queue.run_daily(send_digest, time=HORA_DIGEST, name="digest")
     log.info("bot arriba, digest diario a las %s", HORA_DIGEST)
     app.add_error_handler(on_error)
-    app.run_polling(drop_pending_updates=True)
-
+    app.run_polling(drop_pending_updates=False)
 
 if __name__ == "__main__":
     main()
